@@ -1,0 +1,12 @@
+{
+  "name": "cron-mysql-backup",
+  "version": "1.0.0",
+  "description": "Backup your mysql database on any interval",
+  "main": "index.js",
+  "author": "Tanner Burton",
+  "license": "MIT",
+  "dependencies": {
+    "mysqldump": "^3.0.0",
+    "nodemailer": "^6.2.1"
+  }
+}
