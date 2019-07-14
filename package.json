@@ -1,6 +1,6 @@
 {
   "name": "cron-mysql-backup",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Backup your mysql database on any interval",
   "main": "index.js",
   "author": "Tanner Burton",
