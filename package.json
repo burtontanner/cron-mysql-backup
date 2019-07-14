@@ -6,7 +6,9 @@
   "author": "Tanner Burton",
   "license": "MIT",
   "dependencies": {
+    "diskfree": "^1.1.0",
     "mysqldump": "^3.0.0",
+    "node-cron": "^2.0.3",
     "nodemailer": "^6.2.1"
   }
 }
