@@ -76,11 +76,12 @@ let backupDatabase = async (connection, directory) => {
 let ensureFreeDiskSpace = async (directory) => {
     let largestBackup = await largestBackupSizeBytes(directory);
     let free  = await freeSpaceBytes();
+    let total  = await totalSpaceBytes();
     console.log('free space', free);
     console.log('largest backup', largestBackup);
-    if(largestBackup*8 > free){
+    if((free / total) < total * 0.1) {// keep 10% free
         let fileRemoved = await removeOldestBackup();
-        if(!fileRemoved)return;
+        if(!fileRemoved) return;
         return await ensureFreeDiskSpace(directory)
     }
 };
@@ -90,6 +91,15 @@ let freeSpaceBytes = ()=>{
         diskfree.check('/', (err,stats)=>{
             if(err) reject(err);
             resolve(stats.available);
+        });
+    });
+};
+
+let totalSpaceBytes = ()=>{
+    return new Promise((resolve, reject)=>{
+        diskfree.check('/', (err,stats)=>{
+            if(err) reject(err);
+            resolve(stats.total);
         });
     });
 };
