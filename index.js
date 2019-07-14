@@ -79,8 +79,8 @@ let ensureFreeDiskSpace = async (directory) => {
     let total  = await totalSpaceBytes();
     console.log('free space', free);
     console.log('largest backup', largestBackup);
-    if((free / total) < total * 0.1) {// keep 10% free
-        let fileRemoved = await removeOldestBackup();
+    if((free / total) < total * 0.1) { // keep 10% free
+        let fileRemoved = await removeOldestBackup(directory);
         if(!fileRemoved) return;
         return await ensureFreeDiskSpace(directory)
     }
