@@ -30,12 +30,18 @@ let attemptBackup = async (options) => {
 
     console.log('Backup Complete', new Date(timestamp), timestamp);
     if(++success % options.sendSuccessEmailAfterXBackups !== 0) return;
-    sendSuccessEmail(options.sendTo, options.sendFrom, options.sendFromPassword, timestamp);
+    sendSuccessEmail(options.sendTo, options.sendFrom, options.sendFromPassword, timestamp, options.directory);
+};
+
+let backupCount = async (directory)=>{
+    await ensureDirectoryExists(directory);
+    let files = await fsPromises.readdir(directory);
+    return files.length;
 };
 
 let removeOldestBackups = async (maxBackups, directory) => {
     await ensureDirectoryExists(directory);
-    let files = await fsPromises.readdir(path.join(directory));
+    let files = await fsPromises.readdir(directory);
     files = files.sort(sortFiles);
     let count = 0;
     let now = Date.now();
@@ -68,11 +74,11 @@ let backupDatabase = async (connection, directory) => {
 };
 
 let ensureFreeDiskSpace = async (directory) => {
-    let avgBackup = await averageBackupSizeBytes(directory);
+    let largestBackup = await largestBackupSizeBytes(directory);
     let free  = await freeSpaceBytes();
-    console.log('free', free);
-    console.log('avgBackup', avgBackup);
-    if(avgBackup*8 > free){
+    console.log('free space', free);
+    console.log('largest backup', largestBackup);
+    if(largestBackup*8 > free){
         let fileRemoved = await removeOldestBackup();
         if(!fileRemoved)return;
         return await ensureFreeDiskSpace(directory)
@@ -88,22 +94,22 @@ let freeSpaceBytes = ()=>{
     });
 };
 
-let averageBackupSizeBytes = async (directory) => {
+let largestBackupSizeBytes = async (directory) => {
     await ensureDirectoryExists(directory);
     let files = await fsPromises.readdir(directory);
-    let totalBytes = 0;
-    let len = 0;
+    let largest = 0;
     for (let i in files){
-        len++;
         const stats = await fsPromises.stat(path.join(directory, files[i]));
-        totalBytes += stats.size;    
+        if(stats.size < largest) continue;
+        largest = stats.size;
     }
-    if(!len || !totalBytes) return 0;
-    return totalBytes / len;
+    if(!largest) return 0;
+    return largest;
 };
 
-let sendSuccessEmail = async (sendTo, sendFrom, sendFromPassword, timestamp) => {
-    await sendEmail(sendTo, sendFrom, sendFromPassword, "Database Backup Complete", "Your last database backup was on " + new Date(timestamp));
+let sendSuccessEmail = async (sendTo, sendFrom, sendFromPassword, timestamp, directory) => {
+    let backups = await backupCount(directory);
+    await sendEmail(sendTo, sendFrom, sendFromPassword, "Database Backup Complete", "Your last database backup was on " + new Date(timestamp)+'.\n You have ' + backups +' backups.');
 };
 
 let sendFailureEmail = async (sendTo, sendFrom, sendFromPassword, e) => {
@@ -131,7 +137,7 @@ let sendEmail = async (sendTo, sendFrom, sendFromPassword, subject, body)=>{
 };
 
 let validateOptions = (options) => {
-    let requiredFields = ['cronSchedule', 'sendTo', 'connection', 'sendFrom', 'sendFromPassword', 'sendSuccessEmailAfter', 'directory'];
+    let requiredFields = ['cronSchedule', 'sendTo', 'connection', 'sendFrom', 'sendFromPassword', 'sendSuccessEmailAfterXBackups', 'directory'];
     let requiredConnectionFields = ['host', 'user', 'password', 'database'];
     let missing = validateObj(options, requiredFields);
     let missingConnection = validateObj(options.connection, requiredConnectionFields);

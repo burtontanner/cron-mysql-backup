@@ -31,14 +31,14 @@ Set the Access for less secure apps setting to Enabled (also why you shouldn't u
 
 ## Usage
 
-Import cron-mysql-backup and backup every hour:
+Import cron-mysql-backup and backup every hour on the hour:
 
 ```javascript
-const cronMysqlBackup = require('./cron-mysql-backup');
+const cronMysqlBackup = require('cron-mysql-backup');
 
 let options = {
     directory:'./dumps',
-    cronSchedule:"* * * *",
+    cronSchedule:" 0 * * * *",
     connection:{
         host: 'localhost',
         user: 'make-a-read-only-user',
