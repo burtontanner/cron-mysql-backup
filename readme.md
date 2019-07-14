@@ -1,15 +1,23 @@
-# Node Cron
+# Cron Mysql Backup
 
--- The cron-mysql-backup module allows you to automate mysql backups on regular intervals. 
--- Mysql dump files will be placed in a directory of your choice. 
--- You will get confirmation emails as often as you would like. 
--- Emails will get sent anytime something goes wrong (cannot connect to database).
+### The cron-mysql-backup module allows you to automate mysql backups on regular intervals
+
+### Mysql dump files will be placed in a directory of your choice
+
+### You will get confirmation emails as often as you would like
+
+### Emails will get sent anytime something goes wrong (cannot connect to database etc.)
+
+### Backups will never fill the entire disk space. The oldest ones will be removed first
+
 
 ## Getting Started
 
 Install cron-mysql-backup using npm:
 
 ```console
+$ yarn add cron-mysql-backup
+or 
 $ npm install --save cron-mysql-backup
 ```
 
@@ -21,7 +29,9 @@ After creating an account Go to : https://www.google.com/settings/security/lesss
 
 Set the Access for less secure apps setting to Enabled (also why you shouldn't use a personal account)
 
-IMPORT cron-mysql-backup and backup every hour:
+## Usage
+
+Import cron-mysql-backup and backup every hour:
 
 ```javascript
 const cronMysqlBackup = require('./cron-mysql-backup');
@@ -42,7 +52,8 @@ let options = {
     maxBackups: 7*24 // the maximum number of backups(a weeks worth of hourly backups)
 };
 
-cronMysqlBackup()
+cronMysqlBackup();
+
 ```
 
 ## PM2
