@@ -31,7 +31,7 @@ let options = {
     cronSchedule:"* * * *",
     connection:{
         host: 'localhost',
-        user: 'root',
+        user: 'make-a-read-only-user',
         password: 'password',
         database: 'database',
     },
