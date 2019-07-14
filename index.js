@@ -61,6 +61,7 @@ let removeOldestBackup = async (directory) => {
     let toDelete = files.pop();
     await fsPromises.unlink(path.join(directory, toDelete));
     console.log("Removing Backup", path.join(directory, toDelete));
+    return true;
 };
 
 let backupDatabase = async (connection, directory) => {
@@ -78,8 +79,9 @@ let ensureFreeDiskSpace = async (directory) => {
     let free  = await freeSpaceBytes();
     let total  = await totalSpaceBytes();
     console.log('free space', free);
+    console.log('total space', total);
     console.log('largest backup', largestBackup);
-    if((free / total) < total * 0.1) { // keep 10% free
+    if((free / total) < 0.1) { // keep 10% free
         let fileRemoved = await removeOldestBackup(directory);
         if(!fileRemoved) return;
         return await ensureFreeDiskSpace(directory)
