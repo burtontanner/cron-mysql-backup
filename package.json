@@ -6,10 +6,21 @@
   "author": "Tanner Burton",
   "license": "MIT",
   "dependencies": {
+    "backblaze-b2": "^1.4.0",
     "diskfree": "^1.1.0",
     "mysqldump": "^3.0.0",
     "node-cron": "^2.0.3",
     "nodemailer": "^6.2.1"
   },
-  "keywords": ["cron", "mysql", "backup", "automate", "easy", "nodemailer", "node-cron", "mysqldump", "dump"]
+  "keywords": [
+    "cron",
+    "mysql",
+    "backup",
+    "automate",
+    "easy",
+    "nodemailer",
+    "node-cron",
+    "mysqldump",
+    "dump"
+  ]
 }
