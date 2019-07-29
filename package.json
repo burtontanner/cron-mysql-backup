@@ -1,11 +1,11 @@
 {
   "name": "cron-mysql-backup",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Backup your mysql database on any interval",
   "main": "index.js",
   "author": "Tanner Burton",
   "license": "MIT",
-  "repo":"https://github.com/burtontanner/cron-mysql-backup",
+  "repo": "https://github.com/burtontanner/cron-mysql-backup",
   "dependencies": {
     "backblaze-b2": "^1.4.0",
     "diskfree": "^1.1.0",
