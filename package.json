@@ -5,7 +5,10 @@
   "main": "index.js",
   "author": "Tanner Burton",
   "license": "MIT",
-  "repo": "https://github.com/burtontanner/cron-mysql-backup",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/burtontanner/cron-mysql-backup"
+  },
   "dependencies": {
     "backblaze-b2": "^1.4.0",
     "diskfree": "^1.1.0",
