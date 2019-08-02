@@ -25,12 +25,12 @@ let attemptBackup = async (options) => {
         if(options.maxBackups) await removeOldestBackups(options.maxBackups, options.directory);
     } catch(e) {
         console.error(e);
-        return sendFailureEmail(options.sendTo, options.sendFrom, options.sendFromPassword, e);
+        return sendFailureEmail(options.sendTo, options.sendFrom, options.sendFromPassword, e, options.connection.database);
     }
 
     console.log('Backup Complete', new Date(timestamp), timestamp);
     if(++success % options.sendSuccessEmailAfterXBackups !== 0) return;
-    sendSuccessEmail(options.sendTo, options.sendFrom, options.sendFromPassword, timestamp, options.directory);
+    sendSuccessEmail(options.sendTo, options.sendFrom, options.sendFromPassword, timestamp, options.directory, options.connection.database);
 };
 
 let backupCount = async (directory)=>{
@@ -66,11 +66,11 @@ let removeOldestBackup = async (directory) => {
 
 let backupDatabase = async (connection, directory) => {
     let timestamp = Date.now();
-    ensureDirectoryExists(directory);    
+    ensureDirectoryExists(directory);
     let result = await mysqldump({
         connection,
         dumpToFile: path.join(directory, timestamp+'.sql'),
-    });    
+    });
     return timestamp;
 };
 
@@ -119,13 +119,15 @@ let largestBackupSizeBytes = async (directory) => {
     return largest;
 };
 
-let sendSuccessEmail = async (sendTo, sendFrom, sendFromPassword, timestamp, directory) => {
+let sendSuccessEmail = async (sendTo, sendFrom, sendFromPassword, timestamp, directory, database) => {
     let backups = await backupCount(directory);
-    await sendEmail(sendTo, sendFrom, sendFromPassword, "Database Backup Complete", "Your last database backup was on " + new Date(timestamp)+'.\n You have ' + backups +' backups.');
+    let currentBackups = fs.readdirSync('./').join('\n');
+
+    await sendEmail(sendTo, sendFrom, sendFromPassword, database +" Backup Complete", "Your last database backup was on " + new Date(timestamp)+'.\n You have ' + backups +' backups.\n' + currentBackups);
 };
 
-let sendFailureEmail = async (sendTo, sendFrom, sendFromPassword, e) => {
-    await sendEmail(sendTo, sendFrom, sendFromPassword, "Database Backup Failed", "Here is the error message /n " +e + JSON.stringify(e));
+let sendFailureEmail = async (sendTo, sendFrom, sendFromPassword, e, database) => {
+    await sendEmail(sendTo, sendFrom, sendFromPassword, database + " Backup Failed", "Here is the error message /n " +e + JSON.stringify(e));
 };
 
 let sendEmail = async (sendTo, sendFrom, sendFromPassword, subject, body)=>{
@@ -136,7 +138,7 @@ let sendEmail = async (sendTo, sendFrom, sendFromPassword, subject, body)=>{
         pass: sendFromPassword
       }
     };
-    
+
     let transporter = nodemailer.createTransport(mailConfig);
     let mailOptions = {
       from: '"cron-mysql-backup" <'+sendFrom+'>', // sender address
@@ -174,7 +176,7 @@ let validateObj = (object, required) => {
 };
 
 let sortFiles = (a, b)=>{
-    let aTime = parseInt(a.replace('.sql', ''));    
+    let aTime = parseInt(a.replace('.sql', ''));
     let bTime = parseInt(b.replace('.sql', ''));
     return bTime - aTime;
 };
