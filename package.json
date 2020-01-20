@@ -1,6 +1,6 @@
 {
   "name": "cron-mysql-backup",
-  "version": "1.0.9",
+  "version": "2.0.0",
   "description": "Backup your mysql database on any interval",
   "main": "index.js",
   "author": "Tanner Burton",
@@ -12,7 +12,7 @@
   "dependencies": {
     "backblaze-b2": "^1.4.0",
     "diskfree": "^1.1.0",
-    "mysqldump": "^3.0.0",
+    "mysqldump": "^3.1.0",
     "node-cron": "^2.0.3",
     "nodemailer": "^6.2.1"
   },
