@@ -5,38 +5,48 @@ const path = require('path');
 const fs = require('fs');
 const diskfree = require('diskfree');
 
-
 let fsPromises = fs.promises;
-let success = 0;
 
-let setUpCron =  (options) => {
+let setUpCronJobs =  (options) => {
     validateOptions(options);
-    attemptBackup(options);
-    cron.schedule(options.cronSchedule, () => {
-        attemptBackup(options);
-    });
+
+    // For sanity do a single attempt on the first schedule
+    attemptBackup(options, 0).catch(console.error);
+    for (let i in options.schedules) {
+        cron.schedule(options.schedules[i].cronSchedule, () => {
+            attemptBackup(options, i).catch(console.error);
+        });
+    }
+
+    if (options.sendDailyReportEmail) {
+        // Daily success email
+        cron.schedule("*/2 * * * *", () => {
+        //cron.schedule("0 0 * * *", () => {
+            sendDailyReportEmail(options);
+        })
+    }
 };
 
-let attemptBackup = async (options) => {
-    let timestamp = null;
+let attemptBackup = async (options, index) => {
     try {
-        await ensureFreeDiskSpace(options.directory);
-        timestamp = await backupDatabase(options.connection, options.directory);
-        if(options.maxBackups) await removeOldestBackups(options.maxBackups, options.directory);
+        await validateFreeDiskSpace(options);
+        let backupStartTime = Date.now();
+        let backupFileName = await backupDatabase(options.connection, options.schedules[index].directory);
+        let backupDuation = Date.now() - backupStartTime;
+        await removeOldestBackups(options.schedules[index].maxBackups, options.schedules[index].directory);
+
+        console.log(`Backup Complete (${backupFileName}) - Duration: ${(backupDuation / 1000).toFixed(3)} seconds`);
+        options.schedules[index].successHistory.push({ backupFileName, backupDuation, time: new Date() });
     } catch(e) {
         console.error(e);
         return sendFailureEmail(options.sendTo, options.sendFrom, options.sendFromPassword, e, options.connection.database);
     }
-
-    console.log('Backup Complete', new Date(timestamp), timestamp);
-    if(++success % options.sendSuccessEmailAfterXBackups !== 0) return;
-    sendSuccessEmail(options.sendTo, options.sendFrom, options.sendFromPassword, timestamp, options.directory, options.connection.database);
 };
 
-let backupCount = async (directory)=>{
+let backupList = async (directory)=>{
     await ensureDirectoryExists(directory);
     let files = await fsPromises.readdir(directory);
-    return files.length;
+    return files;
 };
 
 let removeOldestBackups = async (maxBackups, directory) => {
@@ -53,38 +63,34 @@ let removeOldestBackups = async (maxBackups, directory) => {
     }
 };
 
-let removeOldestBackup = async (directory) => {
-    await ensureDirectoryExists(directory);
-    let files = await fsPromises.readdir(directory);
-    files = files.sort(sortFiles);
-    if(files.length === 0)return false;
-    let toDelete = files.pop();
-    await fsPromises.unlink(path.join(directory, toDelete));
-    console.log("Removing Backup", path.join(directory, toDelete));
-    return true;
-};
-
 let backupDatabase = async (connection, directory) => {
-    let timestamp = Date.now();
-    ensureDirectoryExists(directory);
+    await ensureDirectoryExists(directory);
+    let fileName = `${Date.now()}.sql.gz`;
     let result = await mysqldump({
         connection,
-        dumpToFile: path.join(directory, timestamp+'.sql'),
+        dumpToFile: path.join(directory, fileName),
+        compressFile: true
     });
-    return timestamp;
+
+    return fileName;
 };
 
-let ensureFreeDiskSpace = async (directory) => {
-    let largestBackup = await largestBackupSizeBytes(directory);
+let validateFreeDiskSpace = async (options) => {
+    let largestBackupBytes = 0;
+
+    for (let i in options.schedules) {
+        let backupSizeBytes = await largestBackupSizeBytes(options.schedules[i].directory);
+        if (backupSizeBytes > largestBackupBytes)
+            largestBackupBytes = backupSizeBytes;
+    }
+
     let free  = await freeSpaceBytes();
     let total  = await totalSpaceBytes();
-    console.log('free space', free);
-    console.log('total space', total);
-    console.log('largest backup', largestBackup);
+    console.log(`Free space ${(free / (1024*1024*1024)).toFixed(3)} GiB`);
+    console.log(`Total space ${(total / (1024*1024*1024)).toFixed(3)} GiB`);
+    console.log(`Largest backup ${(largestBackupBytes / (1024*1024)).toFixed(3)} MiB`, );
     if((free / total) < 0.1) { // keep 10% free
-        let fileRemoved = await removeOldestBackup(directory);
-        if(!fileRemoved) return;
-        return await ensureFreeDiskSpace(directory)
+        throw new Error("Out of disk space.")
     }
 };
 
@@ -119,15 +125,39 @@ let largestBackupSizeBytes = async (directory) => {
     return largest;
 };
 
-let sendSuccessEmail = async (sendTo, sendFrom, sendFromPassword, timestamp, directory, database) => {
-    let backups = await backupCount(directory);
-    let currentBackups = fs.readdirSync('./').join('\n');
+let sendDailyReportEmail = async (options) => {
+    let averageBackupTime = 0;
+    let backupList = [];
 
-    await sendEmail(sendTo, sendFrom, sendFromPassword, database +" Backup Complete", "Your last database backup was on " + new Date(timestamp)+'.\n You have ' + backups +' backups.\n' + currentBackups);
+    for (let i in options.schedules) {
+        backupList = backupList.concat(options.schedules[i].successHistory);
+    }
+
+    let backupMessageHtml = `<!DOCTYPE html><html><body><style>body { color: #444; }</style><h2>The following is a report of your backup history</h2>`;
+    let backupListHtml = `<table style="border-collapse:collapse; border: 1px solid #a3a3a3;"><tr style="border: 1px solid #a3a3a3;">
+                            <th style="border: 1px solid #a3a3a3; padding: 5px;">Date of Backup</th><th style="border: 1px solid #a3a3a3; padding: 5px;">Duration</th>
+                            <th style="border: 1px solid #a3a3a3; padding: 5px;">Backup Filename</th></tr>`;
+    for (let i in backupList) {
+        averageBackupTime += backupList[i].backupDuation;
+        backupListHtml += `<tr style="border: 1px solid #a3a3a3; padding: 5px;">
+                            <td style="border: 1px solid #a3a3a3; padding: 5px;">${backupList[i].time}</td>
+                            <td style="border: 1px solid #a3a3a3; padding: 5px;">${(backupList[i].backupDuation/1000).toFixed(3)} seconds</td>
+                            <td style="border: 1px solid #a3a3a3; padding: 5px;">${backupList[i].backupFileName}</td></tr>`;
+    }
+    backupListHtml += `</table>`;
+    backupMessageHtml += `<p>Average Backup Time: ${(averageBackupTime/(backupList.length*1000)).toFixed(3)} seconds</p><p>Total Backup Count: ${backupList.length}</p>`;
+    backupMessageHtml += backupListHtml;
+    backupMessageHtml += `</body></html>`;
+    await sendEmail(options.sendTo, options.sendFrom, options.sendFromPassword, `${options.connection.database} - Backup Complete`, backupMessageHtml);
+};
+
+let sendSuccessEmail = async (sendTo, sendFrom, sendFromPassword, backupFileName, directory, database) => {
+    let backups = await backupList(directory);
+    await sendEmail(sendTo, sendFrom, sendFromPassword, `${database} - Backup Complete`, `Your last database backup was on ${new Date()} with filename: ${backupFileName}.<br> You have ${backups.length} backups.<br> ${backups.join('<br>')}`);
 };
 
 let sendFailureEmail = async (sendTo, sendFrom, sendFromPassword, e, database) => {
-    await sendEmail(sendTo, sendFrom, sendFromPassword, database + " Backup Failed", "Here is the error message /n " +e + JSON.stringify(e));
+    await sendEmail(sendTo, sendFrom, sendFromPassword, database + " Backup Failed", "Here is the error message <br> " +e + JSON.stringify(e));
 };
 
 let sendEmail = async (sendTo, sendFrom, sendFromPassword, subject, body)=>{
@@ -151,7 +181,7 @@ let sendEmail = async (sendTo, sendFrom, sendFromPassword, subject, body)=>{
 };
 
 let validateOptions = (options) => {
-    let requiredFields = ['cronSchedule', 'sendTo', 'connection', 'sendFrom', 'sendFromPassword', 'sendSuccessEmailAfterXBackups', 'directory'];
+    let requiredFields = ['schedules', 'sendTo', 'connection', 'sendFrom', 'sendFromPassword', 'sendDailyReportEmail'];
     let requiredConnectionFields = ['host', 'user', 'password', 'database'];
     let missing = validateObj(options, requiredFields);
     let missingConnection = validateObj(options.connection, requiredConnectionFields);
@@ -162,6 +192,20 @@ let validateOptions = (options) => {
     if(missingConnection.length > 0){
         error += 'You need to include '+ missingConnection.join(', ')+ ' in the options.connection object.\n';
     }
+    if(options.schedules.length == 0) {
+        error += 'You did not specify any cron schedules.\n';
+    } else {
+        let requiredScheduleFields = ['cronSchedule', 'directory', 'maxBackups'];
+        let missingScheduleFields = [];
+        for (let i in options.schedules) {
+            options.schedules[i].successHistory = [];
+            missingScheduleFields = missingScheduleFields.concat(validateObj(options.schedules[i], requiredScheduleFields));
+        }
+        if(missingScheduleFields.length > 0){
+            error += 'You need to include '+ missingScheduleFields.join(', ')+ ' in the options.schedules object.\n';
+        }
+    }
+
     if(error)throw new Error(error);
 };
 
@@ -187,4 +231,4 @@ let ensureDirectoryExists = async (directory) => {
     }
 };
 
-module.exports = setUpCron;
+module.exports = setUpCronJobs;

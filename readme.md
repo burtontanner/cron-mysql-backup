@@ -1,15 +1,9 @@
 # Cron Mysql Backup
 
-### The cron-mysql-backup module allows you to automate mysql backups on regular intervals
-
-### Mysql dump files will be placed in a directory of your choice
-
-### You will get confirmation emails as often as you would like
-
-### Emails will get sent anytime something goes wrong (cannot connect to database etc.)
-
-### Backups will never fill the entire disk space. The oldest ones will be removed first
-
+The cron-mysql-backup module allows you to automate mysql backups on regular intervals. Mysql dump files will be placed 
+in a directory of your choice. You will get confirmation emails as often as you would like. Emails will get sent anytime
+something goes wrong (cannot connect to database etc.). Backups will never fill the entire disk space. The oldest ones
+will be removed first
 
 ## Getting Started
 
@@ -37,23 +31,36 @@ Import cron-mysql-backup and backup every hour on the hour:
 const cronMysqlBackup = require('cron-mysql-backup');
 
 let options = {
-    directory:'./dumps',
-    cronSchedule:" 0 * * * *",
-    connection:{
-        host: 'localhost',
-        user: 'make-a-read-only-user',
-        password: 'password',
-        database: 'database',
+    schedules: [{
+        cronSchedule: "55 * * * *", // Hourly at XX:55.
+        directory: './databaseName/hourly',
+        maxBackups: 24
+    }, {
+        cronSchedule: "30 0 * * *",  // Daily at 12:30 a.m.
+        directory: './databaseName/daily',
+        maxBackups: 7
+    }, {
+        cronSchedule: "30 1 * * 0",  // Weekly Sunday at 1:30 a.m.
+        directory: './databaseName/weekly',
+        maxBackups: 4
+    }, {
+        cronSchedule: "0 3 1 * *",  // First Day of every month at 3:00 a.m.
+        directory: './databaseName/monthly',
+        maxBackups: 12
+    }],
+    connection: {
+        host: 'database.ip.net',
+        user: 'root',
+        password: 'yourpassword',
+        database: 'databaseName',
     },
-    sendTo:'test@test.com',//Notifications will be sent to this address. This can also be an array of email addresses
-    sendFrom:'create-an-email@gmail.com',
-    sendFromPassword:'gmailPassword',
-    sendSuccessEmailAfterXBackups:10, //Send confirmation email after every 10 backups()
-    maxBackups: 7*24 // the maximum number of backups(a weeks worth of hourly backups)
+    sendTo: 'steve@apple.com',
+    sendFrom: 'backup@gmail.com',
+    sendFromPassword: 'gmailPassword',
+    sendDailyReportEmail: true,
 };
 
-cronMysqlBackup();
-
+cronMysqlBackup(options);
 ```
 
 ## PM2
