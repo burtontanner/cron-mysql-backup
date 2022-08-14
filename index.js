@@ -22,7 +22,7 @@ const sendEmail = (sendTo,sendFrom, sendGridApiKey, subject, email_content) => {
       console.log("sendgrid ", response[0].headers)
     })
     .catch((error) => {
-      console.error("sendgrid ", error)
+      console.error("sendgrid ", error.toString(), JSON.stringify(error, null, 2))
     })
 };
 
