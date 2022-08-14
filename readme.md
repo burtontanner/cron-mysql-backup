@@ -21,13 +21,7 @@ or
 $ npm install --save cron-mysql-backup
 ```
 
-You will need a gmail account to send emails from. 
-
-I wouldn't use your personal account.
-
-After creating an account Go to : https://www.google.com/settings/security/lesssecureapps
-
-Set the Access for less secure apps setting to Enabled (also why you shouldn't use a personal account)
+You will need a sendgrid account to send emails from. 
 
 ## Usage
 
@@ -45,9 +39,9 @@ let options = {
         password: 'password',
         database: 'database',
     },
-    sendTo:'test@test.com',//Notifications will be sent to this address. This can also be an array of email addresses
+    sendTo:'test@test.com', // Notifications will be sent to this address. This can also be an array of email addresses
     sendFrom:'create-an-email@gmail.com',
-    sendFromPassword:'gmailPassword',
+    sendGridApiKey:'sendGridApiKeyHere',
     sendSuccessEmailAfterXBackups:10, //Send confirmation email after every 10 backups()
     maxBackups: 7*24 // the maximum number of backups(a weeks worth of hourly backups)
 };

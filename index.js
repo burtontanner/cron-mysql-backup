@@ -1,10 +1,30 @@
 const mysqldump = require('mysqldump');
 const cron = require('node-cron');
-const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
 const diskfree = require('diskfree');
+const sgMail = require('@sendgrid/mail')
 
+
+const sendEmail = (sendTo,sendFrom, sendGridApiKey, subject, email_content) => {
+  let msg = {
+    to: sendTo,
+    from: sendFrom,
+    subject,
+    text: subject,
+    html: email_content,
+  }
+  sgMail.setApiKey(sendGridApiKey)
+  sgMail
+    .send(msg)
+    .then((response) => {
+      console.log("sendgrid ", response[0].statusCode)
+      console.log("sendgrid ", response[0].headers)
+    })
+    .catch((error) => {
+      console.error("sendgrid ", error)
+    })
+};
 
 let fsPromises = fs.promises;
 let success = 0;
@@ -25,12 +45,12 @@ let attemptBackup = async (options) => {
         if(options.maxBackups) await removeOldestBackups(options.maxBackups, options.directory);
     } catch(e) {
         console.error(e);
-        return sendFailureEmail(options.sendTo, options.sendFrom, options.sendFromPassword, e, options.connection.database);
+        return sendFailureEmail(options.sendTo, options.sendFrom, options.sendGridApiKey, e, options.connection.database);
     }
 
     console.log('Backup Complete', new Date(timestamp), timestamp);
     if(++success % options.sendSuccessEmailAfterXBackups !== 0) return;
-    sendSuccessEmail(options.sendTo, options.sendFrom, options.sendFromPassword, timestamp, options.directory, options.connection.database);
+    sendSuccessEmail(options.sendTo, options.sendFrom, options.sendGridApiKey, timestamp, options.directory, options.connection.database);
 };
 
 let backupCount = async (directory)=>{
@@ -119,39 +139,20 @@ let largestBackupSizeBytes = async (directory) => {
     return largest;
 };
 
-let sendSuccessEmail = async (sendTo, sendFrom, sendFromPassword, timestamp, directory, database) => {
+let sendSuccessEmail = async (sendTo, sendFrom, sendGridApiKey, timestamp, directory, database) => {
     let backups = await backupCount(directory);
-    let currentBackups = fs.readdirSync('./').join('\n');
+    let currentBackups = fs.readdirSync(directory).join('\n');
 
-    await sendEmail(sendTo, sendFrom, sendFromPassword, database +" Backup Complete", "Your last database backup was on " + new Date(timestamp)+'.\n You have ' + backups +' backups.\n' + currentBackups);
+    await sendEmail(sendTo, sendFrom,sendGridApiKey,database +" Backup Complete", "Your last database backup was on " + new Date(timestamp)+'.\n You have ' + backups +' backups.\n' + currentBackups);
 };
 
-let sendFailureEmail = async (sendTo, sendFrom, sendFromPassword, e, database) => {
-    await sendEmail(sendTo, sendFrom, sendFromPassword, database + " Backup Failed", "Here is the error message /n " +e + JSON.stringify(e));
+let sendFailureEmail = async (sendTo, sendFrom, sendGridKey, e, database) => {
+    await sendEmail(sendTo, sendFrom, sendGridKey, database + " Backup Failed", "Here is the error message /n " +e + JSON.stringify(e));
 };
 
-let sendEmail = async (sendTo, sendFrom, sendFromPassword, subject, body)=>{
-    let mailConfig = {
-      service: 'gmail',
-      auth: {
-        user: sendFrom,
-        pass: sendFromPassword
-      }
-    };
-
-    let transporter = nodemailer.createTransport(mailConfig);
-    let mailOptions = {
-      from: '"cron-mysql-backup" <'+sendFrom+'>', // sender address
-      to: sendTo, // list of receivers
-      subject, // Subject line
-      html: body
-    };
-    let info = await transporter.sendMail(mailOptions);
-    console.log('Email Sent', info.response);
-};
 
 let validateOptions = (options) => {
-    let requiredFields = ['cronSchedule', 'sendTo', 'connection', 'sendFrom', 'sendFromPassword', 'sendSuccessEmailAfterXBackups', 'directory'];
+    let requiredFields = ['cronSchedule', 'sendTo', 'connection', 'sendFrom', 'sendGridApiKey', 'sendSuccessEmailAfterXBackups', 'directory'];
     let requiredConnectionFields = ['host', 'user', 'password', 'database'];
     let missing = validateObj(options, requiredFields);
     let missingConnection = validateObj(options.connection, requiredConnectionFields);
