@@ -38,6 +38,7 @@ let setUpCron =  (options) => {
 };
 
 let attemptBackup = async (options) => {
+    console.log('Starting Backup')
     let timestamp = null;
     try {
         await ensureFreeDiskSpace(options.directory);
@@ -141,7 +142,7 @@ let largestBackupSizeBytes = async (directory) => {
 
 let sendSuccessEmail = async (sendTo, sendFrom, sendGridApiKey, timestamp, directory, database) => {
     let backups = await backupCount(directory);
-    let currentBackups = fs.readdirSync(directory).join('\n');
+    let currentBackups = fs.readdirSync(directory).map(toDate).join('\n');
 
     await sendEmail(sendTo, sendFrom,sendGridApiKey,database +" Backup Complete", "Your last database backup was on " + new Date(timestamp)+'.\n You have ' + backups +' backups.\n' + currentBackups);
 };
@@ -187,5 +188,8 @@ let ensureDirectoryExists = async (directory) => {
         await fsPromises.mkdir(directory);
     }
 };
+const toDate = (backupFileName) => {
+   return new Date(parseInt(backupFileName.replace('.sql', ''))).toISOString()
+}
 
 module.exports = setUpCron;
